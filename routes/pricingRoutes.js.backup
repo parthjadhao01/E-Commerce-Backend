@@ -1,0 +1,488 @@
+import express from "express";
+import {
+  createProductPricing,
+  getProductPricings,
+  getProductPricing,
+  updateProductPricing,
+  deleteProductPricing,
+  createTierPricing,
+  getTierPricings,
+  getTierPricing,
+  updateTierPricing,
+  deleteTierPricing,
+  createSpecialPricing,
+  getSpecialPricings,
+  getSpecialPricing,
+  updateSpecialPricing,
+  deleteSpecialPricing,
+} from "../controllers/pricingController.js";
+import { protect, adminOnly } from "../middleware/authMiddleware.js";
+
+const router = express.Router();
+
+/**
+ * @swagger
+ * tags:
+ *   name: Pricing
+ *   description: Product pricing management
+ */
+
+// Product Pricing
+/**
+ * @swagger
+ * /api/admin/pricing:
+ *   post:
+ *     summary: Create product pricing
+ *     tags: [Pricing]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - productId
+ *               - price
+ *             properties:
+ *               productId:
+ *                 type: string
+ *               price:
+ *                 type: number
+ *               currency:
+ *                 type: string
+ *               validFrom:
+ *                 type: string
+ *                 format: date-time
+ *               validTo:
+ *                 type: string
+ *                 format: date-time
+ *     responses:
+ *       201:
+ *         description: Pricing created
+ *       400:
+ *         description: Validation error
+ *       500:
+ *         description: Server error
+ */
+router.post("/", protect, adminOnly, createProductPricing);
+
+/**
+ * @swagger
+ * /api/admin/pricing:
+ *   get:
+ *     summary: Get all product pricings (optionally by product)
+ *     tags: [Pricing]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: productId
+ *         schema:
+ *           type: string
+ *         description: Filter by product ID
+ *     responses:
+ *       200:
+ *         description: List of pricings
+ *       500:
+ *         description: Server error
+ */
+router.get("/", protect, adminOnly, getProductPricings);
+
+/**
+ * @swagger
+ * /api/admin/pricing/{id}:
+ *   get:
+ *     summary: Get a single product pricing by ID
+ *     tags: [Pricing]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Pricing ID
+ *     responses:
+ *       200:
+ *         description: Pricing data
+ *       404:
+ *         description: Pricing not found
+ *       500:
+ *         description: Server error
+ */
+router.get("/:id", protect, adminOnly, getProductPricing);
+
+/**
+ * @swagger
+ * /api/admin/pricing/{id}:
+ *   put:
+ *     summary: Update product pricing
+ *     tags: [Pricing]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Pricing ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               price:
+ *                 type: number
+ *               currency:
+ *                 type: string
+ *               validFrom:
+ *                 type: string
+ *                 format: date-time
+ *               validTo:
+ *                 type: string
+ *                 format: date-time
+ *     responses:
+ *       200:
+ *         description: Pricing updated
+ *       404:
+ *         description: Pricing not found
+ *       500:
+ *         description: Server error
+ */
+router.put("/:id", protect, adminOnly, updateProductPricing);
+
+/**
+ * @swagger
+ * /api/admin/pricing/{id}:
+ *   delete:
+ *     summary: Delete product pricing
+ *     tags: [Pricing]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Pricing ID
+ *     responses:
+ *       200:
+ *         description: Pricing deleted
+ *       404:
+ *         description: Pricing not found
+ *       500:
+ *         description: Server error
+ */
+router.delete("/:id", protect, adminOnly, deleteProductPricing);
+
+// Tier Pricing
+/**
+ * @swagger
+ * /api/admin/pricing/tier:
+ *   post:
+ *     summary: Create tier pricing
+ *     tags: [Pricing]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - productId
+ *               - minQty
+ *               - price
+ *             properties:
+ *               productId:
+ *                 type: string
+ *               minQty:
+ *                 type: integer
+ *               price:
+ *                 type: number
+ *               currency:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Tier pricing created
+ *       400:
+ *         description: Validation error
+ *       500:
+ *         description: Server error
+ */
+router.post("/tier", protect, adminOnly, createTierPricing);
+
+/**
+ * @swagger
+ * /api/admin/pricing/tier:
+ *   get:
+ *     summary: Get all tier pricings (optionally by product)
+ *     tags: [Pricing]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: productId
+ *         schema:
+ *           type: string
+ *         description: Filter by product ID
+ *     responses:
+ *       200:
+ *         description: List of tier pricings
+ *       500:
+ *         description: Server error
+ */
+router.get("/tier", protect, adminOnly, getTierPricings);
+
+/**
+ * @swagger
+ * /api/admin/pricing/tier/{id}:
+ *   get:
+ *     summary: Get a single tier pricing by ID
+ *     tags: [Pricing]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Tier pricing ID
+ *     responses:
+ *       200:
+ *         description: Tier pricing data
+ *       404:
+ *         description: Tier pricing not found
+ *       500:
+ *         description: Server error
+ */
+router.get("/tier/:id", protect, adminOnly, getTierPricing);
+
+/**
+ * @swagger
+ * /api/admin/pricing/tier/{id}:
+ *   put:
+ *     summary: Update tier pricing
+ *     tags: [Pricing]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Tier pricing ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               minQty:
+ *                 type: integer
+ *               price:
+ *                 type: number
+ *               currency:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Tier pricing updated
+ *       404:
+ *         description: Tier pricing not found
+ *       500:
+ *         description: Server error
+ */
+router.put("/tier/:id", protect, adminOnly, updateTierPricing);
+
+/**
+ * @swagger
+ * /api/admin/pricing/tier/{id}:
+ *   delete:
+ *     summary: Delete tier pricing
+ *     tags: [Pricing]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Tier pricing ID
+ *     responses:
+ *       200:
+ *         description: Tier pricing deleted
+ *       404:
+ *         description: Tier pricing not found
+ *       500:
+ *         description: Server error
+ */
+router.delete("/tier/:id", protect, adminOnly, deleteTierPricing);
+
+// Special Pricing
+/**
+ * @swagger
+ * /api/admin/pricing/special:
+ *   post:
+ *     summary: Create special pricing
+ *     tags: [Pricing]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - productId
+ *               - price
+ *             properties:
+ *               productId:
+ *                 type: string
+ *               price:
+ *                 type: number
+ *               currency:
+ *                 type: string
+ *               validFrom:
+ *                 type: string
+ *                 format: date-time
+ *               validTo:
+ *                 type: string
+ *                 format: date-time
+ *     responses:
+ *       201:
+ *         description: Special pricing created
+ *       400:
+ *         description: Validation error
+ *       500:
+ *         description: Server error
+ */
+router.post("/special", protect, adminOnly, createSpecialPricing);
+
+/**
+ * @swagger
+ * /api/admin/pricing/special:
+ *   get:
+ *     summary: Get all special pricings (optionally by product)
+ *     tags: [Pricing]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: productId
+ *         schema:
+ *           type: string
+ *         description: Filter by product ID
+ *     responses:
+ *       200:
+ *         description: List of special pricings
+ *       500:
+ *         description: Server error
+ */
+router.get("/special", protect, adminOnly, getSpecialPricings);
+
+/**
+ * @swagger
+ * /api/admin/pricing/special/{id}:
+ *   get:
+ *     summary: Get a single special pricing by ID
+ *     tags: [Pricing]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Special pricing ID
+ *     responses:
+ *       200:
+ *         description: Special pricing data
+ *       404:
+ *         description: Special pricing not found
+ *       500:
+ *         description: Server error
+ */
+router.get("/special/:id", protect, adminOnly, getSpecialPricing);
+
+/**
+ * @swagger
+ * /api/admin/pricing/special/{id}:
+ *   put:
+ *     summary: Update special pricing
+ *     tags: [Pricing]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Special pricing ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               price:
+ *                 type: number
+ *               currency:
+ *                 type: string
+ *               validFrom:
+ *                 type: string
+ *                 format: date-time
+ *               validTo:
+ *                 type: string
+ *                 format: date-time
+ *     responses:
+ *       200:
+ *         description: Special pricing updated
+ *       404:
+ *         description: Special pricing not found
+ *       500:
+ *         description: Server error
+ */
+router.put("/special/:id", protect, adminOnly, updateSpecialPricing);
+
+/**
+ * @swagger
+ * /api/admin/pricing/special/{id}:
+ *   delete:
+ *     summary: Delete special pricing
+ *     tags: [Pricing]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Special pricing ID
+ *     responses:
+ *       200:
+ *         description: Special pricing deleted
+ *       404:
+ *         description: Special pricing not found
+ *       500:
+ *         description: Server error
+ */
+router.delete("/special/:id", protect, adminOnly, deleteSpecialPricing);
+
+export default router;
