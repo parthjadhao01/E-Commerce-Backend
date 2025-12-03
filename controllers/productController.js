@@ -3,6 +3,9 @@ import Brand from "../models/product/BrandModel.js";
 import Category from "../models/product/CategoryModel.js";
 import fs from "fs";
 import path from "path";
+import mongoose, {Types} from "mongoose";
+import cloudinary from "../config/cloudinary.js";
+
 
 // Helper function to delete a file
 const deleteFile = (filePath) => {
@@ -24,6 +27,26 @@ const deleteFile = (filePath) => {
 // Create a new product
 export const createProduct = async (req, res) => {
   try {
+      // Normalize multipart/form-data fields
+      if (typeof req.body.categoryIds === "string") {
+          try {
+              req.body.categoryIds = JSON.parse(req.body.categoryIds);
+          } catch {
+              req.body.categoryIds = req.body.categoryIds.split(",");
+          }
+      }
+
+      if (typeof req.body.isFeatured === "string") {
+          req.body.isFeatured = req.body.isFeatured === "true";
+      }
+
+      if (typeof req.body.tags === "string") {
+          req.body.tags = req.body.tags.split(",");
+      }
+
+      if (typeof req.body.status === "string") {
+          req.body.status = req.body.status.trim();
+      }
     const {
       title,
       slug,
@@ -48,17 +71,27 @@ export const createProduct = async (req, res) => {
     if (existingSku)
       return res.status(409).json({ message: "SKU already exists" });
     // Validate brand and categories
-    const brand = await Brand.findById(brandId);
+      const brandid = new mongoose.Types.ObjectId(brandId);
+    const brand = await Brand.findById(brandid);
     if (!brand) return res.status(400).json({ message: "Invalid brandId" });
     const categories = await Category.find({ _id: { $in: categoryIds } });
     if (categories.length !== categoryIds.length)
       return res.status(400).json({ message: "Invalid categoryIds" });
 
-    // Handle thumbnail - either uploaded file or URL
-    let thumbnailPath = thumbnail || "";
-    if (req.file) {
-      thumbnailPath = `/uploads/products/${req.file.filename}`;
-    }
+      let thumbnailUrl = "";
+
+      if (req.file) {
+          const upload = await cloudinary.uploader.upload(req.file.path, {
+              folder: "products",
+          });
+
+          thumbnailUrl = upload.secure_url;
+
+          // remove temp file
+          fs.unlinkSync(req.file.path);
+      } else {
+          thumbnailUrl = thumbnail || "";
+      }
 
     // Create product
     const product = await Product.create({
@@ -69,7 +102,7 @@ export const createProduct = async (req, res) => {
       categoryIds,
       type,
       sku,
-      thumbnail: thumbnailPath,
+      thumbnail: thumbnailUrl,
       status,
       isFeatured,
       tags,
