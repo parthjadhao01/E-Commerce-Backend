@@ -66,46 +66,52 @@ const productStorage = multer.diskStorage({
 
 // File filter - only allow images
 const fileFilter = (req, file, cb) => {
-  console.log("File upload attempt:", {
-    fieldname: file.fieldname,
-    originalname: file.originalname,
-    mimetype: file.mimetype,
-    size: file.size,
-  });
+    console.log("File upload attempt:", {
+        fieldname: file.fieldname,
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+    });
 
-  const allowedMimeTypes = [
-    "image/jpeg",
-    "image/jpg",
-    "image/png",
-    "image/gif",
-    "image/webp",
-    "image/svg+xml",
-    "image/avif",
-  ];
+    const allowedMimeTypes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "image/svg+xml",
+        "image/avif",
 
-  const allowedExtensions = /\.(jpeg|jpg|png|gif|webp|svg|avif)$/i;
+        // mobile camera images
+        "image/heic",
+        "image/heif",
+        "image/pjpeg",
+        "image/x-png",
+    ];
 
-  const hasValidExtension = allowedExtensions.test(file.originalname);
-  const hasValidMimeType = allowedMimeTypes.includes(
-    file.mimetype.toLowerCase()
-  );
+    const allowedExtensions = /\.(jpeg|jpg|png|gif|webp|svg|avif|heic|heif)$/i;
 
-  console.log("Validation results:", {
-    hasValidExtension,
-    hasValidMimeType,
-    mimeTypeLower: file.mimetype.toLowerCase(),
-  });
+    const hasValidExtension = allowedExtensions.test(file.originalname);
+    const hasValidMimeType = allowedMimeTypes.includes(file.mimetype.toLowerCase());
 
-  if (hasValidMimeType && hasValidExtension) {
+    console.log("Validation results:", {
+        hasValidExtension,
+        hasValidMimeType,
+        mimeTypeLower: file.mimetype.toLowerCase(),
+    });
+
+    if (!hasValidMimeType || !hasValidExtension) {
+        console.log("❌ Rejected file:", {
+            name: file.originalname,
+            type: file.mimetype,
+            reason: "Invalid extension or MIME type",
+        });
+
+        return cb(new Error("Invalid file type."), false);
+    }
+
     return cb(null, true);
-  } else {
-    cb(
-      new Error(
-        "Invalid file type. Only JPEG, PNG, GIF, WEBP, SVG, and AVIF are allowed."
-      )
-    );
-  }
 };
+
 
 // Multer upload configuration for categories
 const categoryUpload = multer({

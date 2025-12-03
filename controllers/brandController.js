@@ -1,6 +1,6 @@
 import Brand from "../models/product/BrandModel.js";
 import fs from "fs";
-import path from "path";
+import cloudinary from "../config/cloudinary.js";
 
 // Helper function to delete old file
 const deleteFile = (filePath) => {
@@ -15,53 +15,78 @@ const deleteFile = (filePath) => {
 
 // Create a new brand
 export const createBrand = async (req, res) => {
-  try {
-    const {
-      name,
-      slug,
-      description,
-      logo,
-      website,
-      status,
-      isFeatured,
-    } = req.body;
+    try {
+        const {
+            name,
+            slug,
+            description,
+            logo,
+            website,
+            status,
+            isFeatured,
+        } = req.body;
 
-    if (!name || !slug) {
-      return res.status(400).json({ message: "Name and slug are required" });
+        if (!name || !slug) {
+            return res.status(400).json({ message: "Name and slug are required" });
+        }
+
+        // Check for unique slug
+        const existing = await Brand.findOne({ slug });
+        if (existing) {
+            return res.status(409).json({ message: "Slug already exists" });
+        }
+
+        let uploadedLogo = logo || ""; // logo URL if provided from frontend
+
+        // ------------------------------
+        // 📌 If multer uploaded file → upload to Cloudinary
+        // ------------------------------
+        if (req.file) {
+            const localPath = req.file.path;
+
+            try {
+                const result = await cloudinary.uploader.upload(localPath, {
+                    folder: "brands",
+                    public_id: `brand-${Date.now()}`,
+                });
+
+                uploadedLogo = result.secure_url;
+
+                // Delete local file
+                if (fs.existsSync(localPath)) fs.unlinkSync(localPath);
+            } catch (cloudErr) {
+                console.error("Cloudinary Upload Error:", cloudErr);
+
+                // Cleanup local file if Cloudinary fails
+                if (fs.existsSync(localPath)) fs.unlinkSync(localPath);
+
+                return res.status(500).json({ message: "Cloudinary upload failed" });
+            }
+        }
+
+        // ---------------------------------------
+        // 📌 Create Brand in Database
+        // ---------------------------------------
+        const brand = await Brand.create({
+            name,
+            slug,
+            description,
+            logo: uploadedLogo,
+            website: website || "",
+            status: status !== undefined ? status : true,
+            isFeatured: isFeatured !== undefined ? isFeatured : false,
+        });
+
+        res.status(201).json(brand);
+    } catch (err) {
+        // Cleanup if multer file exists
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+
+        console.error("Error creating brand:", err);
+        res.status(500).json({ message: err.message });
     }
-
-    // Check for unique slug
-    const existing = await Brand.findOne({ slug });
-    if (existing) {
-      return res.status(409).json({ message: "Slug already exists" });
-    }
-
-    // Handle logo (file upload or URL)
-    let logoPath = logo || "";
-
-    // If file is uploaded, use uploaded file path
-    if (req.file) {
-      logoPath = `/uploads/brands/${req.file.filename}`;
-    }
-
-    const brand = await Brand.create({
-      name,
-      slug,
-      description,
-      logo: logoPath,
-      website: website || "",
-      status: status !== undefined ? status : true,
-      isFeatured: isFeatured !== undefined ? isFeatured : false,
-    });
-
-    res.status(201).json(brand);
-  } catch (err) {
-    // Clean up uploaded file if brand creation fails
-    if (req.file) {
-      deleteFile(`/uploads/brands/${req.file.filename}`);
-    }
-    res.status(500).json({ message: err.message });
-  }
 };
 
 // Get all brands
