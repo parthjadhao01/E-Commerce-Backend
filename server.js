@@ -88,8 +88,6 @@ app.get("/", (req, res) => {
 
 
 
-
-
 // routers login import
 app.use("/api/user", authRoutes);
 app.use("/api/social", socialRoutes);

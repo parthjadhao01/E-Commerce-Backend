@@ -52,4 +52,9 @@ const router = express.Router();
  */
 router.get("/products", userController.getAllProducts);
 
+// need to implement this given below apis
+router.get("/categories",userController.getAllCategories);
+// router.get("/productdetail/:id")
+
+
 export default router;

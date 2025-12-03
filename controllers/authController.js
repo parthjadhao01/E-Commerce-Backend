@@ -11,76 +11,204 @@ import { saveOTP, verifyOTP } from "../utils/otpStore.js";
 
 // lets start write our controller for auth acccording to the schemas
 
+// export const registerUser = async (req, res) => {
+//   // Here we will handle user registration logic
+//   const { name, email, phone, password } = req.body;
+//
+//   if (!name || (!email && !phone) || !password) {
+//     return res
+//       .status(400)
+//       .json({ message: "Name, Email/Phone and Password are required" });
+//   }
+//
+//   try {
+//     // Check if user already exists
+//     const existingUser = await User.findOne({
+//       $or: [{ email }, { phone }],
+//     });
+//
+//     if (existingUser) {
+//       return res.status(409).json({ message: "User already exists" });
+//     }
+//
+//     // roles can be assigned later, default role can be 'user'
+//     let userRole = await Role.findOne({ name: "user" });
+//     if (!userRole) {
+//       // Create default user role if it doesn't exist
+//       userRole = await Role.create({
+//         name: "user",
+//         displayName: "User",
+//         description: "Regular user with standard privileges",
+//       });
+//     }
+//
+//     const newUser = new User({
+//       name,
+//       email,
+//       phone,
+//       password, // will be hashed in pre-save hook
+//       roles: [userRole.name],
+//       status: "active",
+//       emailVerified: false,
+//       phoneVerified: false,
+//     });
+//
+//     // Save the new user to the database before sending OTP
+//     await newUser.save();
+//   } catch (error) {
+//     console.error("Error registering user:", error);
+//     return res.status(500).json({ message: "Internal Server Error" });
+//   }
+// };
+
 export const registerUser = async (req, res) => {
-  // Here we will handle user registration logic
-  const { name, email, phone, password } = req.body;
+    const { name, email, phone, password } = req.body;
 
-  if (!name || (!email && !phone) || !password) {
-    return res
-      .status(400)
-      .json({ message: "Name, Email/Phone and Password are required" });
-  }
-
-  try {
-    // Check if user already exists
-    const existingUser = await User.findOne({
-      $or: [{ email }, { phone }],
-    });
-
-    if (existingUser) {
-      return res.status(409).json({ message: "User already exists" });
+    if (!name || (!email && !phone) || !password) {
+        return res.status(400).json({
+            success: false,
+            message: "Name, Email/Phone and Password are required",
+        });
     }
 
-    // roles can be assigned later, default role can be 'user'
-    let userRole = await Role.findOne({ name: "user" });
-    if (!userRole) {
-      // Create default user role if it doesn't exist
-      userRole = await Role.create({
-        name: "user",
-        displayName: "User",
-        description: "Regular user with standard privileges",
-      });
+    try {
+        // Check if user already exists
+        const existingUser = await User.findOne({
+            $or: [{ email }, { phone }],
+        });
+
+        if (existingUser) {
+            return res.status(409).json({
+                success: false,
+                message: "User already exists",
+            });
+        }
+
+        // Get default role "user"
+        let userRole = await Role.findOne({ name: "user" });
+        if (!userRole) {
+            userRole = await Role.create({
+                name: "user",
+                displayName: "User",
+                description: "Regular user with standard privileges",
+            });
+        }
+
+        // Create user (password hashed by pre-save hook)
+        const user = new User({
+            name,
+            email,
+            phone,
+            password,
+            roles: [userRole.name],
+            status: "active",
+            emailVerified: false,
+            phoneVerified: false,
+        });
+
+        await user.save();
+
+        // Create token
+        const token = jwt.sign(
+            { id: user._id, email: user.email, roles: user.roles },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
+        );
+
+        return res.status(201).json({
+            success: true,
+            message: "User registered successfully",
+            token,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                roles: user.roles,
+            },
+        });
+    } catch (error) {
+        console.error("User registration error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error during user registration",
+        });
     }
-
-    const newUser = new User({
-      name,
-      email,
-      phone,
-      password, // will be hashed in pre-save hook
-      roles: [userRole.name],
-      status: "active",
-      emailVerified: false,
-      phoneVerified: false,
-    });
-
-    // Save the new user to the database before sending OTP
-    await newUser.save();
-
-    // send verification OTP if email is provided
-    if (email) {
-      const otp = generateOTP();
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
-
-      const emailSent = await sendVerificationEmail(email, otp);
-      if (!emailSent) {
-        return res
-          .status(500)
-          .json({ message: "Failed to send verification email." });
-      }
-
-      // Save OTP and expiry to in-memory store
-      saveOTP(email, otp, expiresAt);
-
-      return res.status(201).json({
-        message:
-          "User registered successfully. Verification OTP sent to email.",
-      });
-    }
-  } catch (error) {
-    console.error("Error registering user:", error);
-    return res.status(500).json({ message: "Internal Server Error" });
-  }
 };
+
+export const loginUser = async (req, res) => {
+    const { email, phone, password } = req.body;
+
+    if ((!email && !phone) || !password) {
+        return res.status(400).json({
+            success: false,
+            message: "Email/Phone and password are required",
+        });
+    }
+
+    try {
+        // Find user by email or phone
+        const user = await User.findOne({
+            $or: [{ email }, { phone }],
+            roles: "user", // ensures only normal users login via this route
+        });
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid credentials",
+            });
+        }
+
+        // Validate password
+        const isMatch = await bcrypt.compare(password, user.passwordHash);
+        if (!isMatch) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid credentials",
+            });
+        }
+
+        // Check account status
+        if (user.status !== "active") {
+            return res.status(403).json({
+                success: false,
+                message: "User account is not active",
+            });
+        }
+
+        // Create JWT
+        const token = jwt.sign(
+            { id: user._id, email: user.email, roles: user.roles },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
+        );
+
+        // Optional: update last login
+        user.lastLogin = new Date();
+        await user.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "User login successful",
+            token,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                roles: user.roles,
+            },
+        });
+    } catch (error) {
+        console.error("User login error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error during user login",
+        });
+    }
+};
+
 
 // Logout controller: removes refresh token from DB and clears cookie
 export const logout = async (req, res) => {
@@ -132,63 +260,6 @@ export const verifyEmail = async (req, res) => {
     return res.status(200).json({ message: "Email verified successfully" });
   } catch (error) {
     console.error("Error verifying email:", error);
-    return res.status(500).json({ message: "Internal Server Error" });
-  }
-};
-
-// login controller can be added similarly
-export const loginUser = async (req, res) => {
-  const { email, phone, password } = req.body;
-  if ((!email && !phone) || !password) {
-    return res
-      .status(400)
-      .json({ message: "Email/Phone and Password are required" });
-  }
-  try {
-    // Find user by email or phone
-    const user = await User.findOne({
-      $or: [{ email }, { phone }],
-    });
-    if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-    // Compare password
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-    // Create or update device record
-    const deviceInfo = {
-      userId: user._id,
-      deviceName: req.headers["user-agent"] || "Unknown Device",
-      ip: req.ip,
-      userAgent: req.headers["user-agent"],
-    };
-    await Device.findOneAndUpdate(
-      {
-        userId: user._id,
-        userAgent: deviceInfo.userAgent,
-        ip: deviceInfo.ip,
-      },
-      deviceInfo,
-      { upsert: true, new: true }
-    );
-    // Generate OTP for 2FA
-    const otp = generateOTP();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min
-
-    saveOTP(user.email || user.phone, otp, expiresAt);
-    // Send OTP (email preferred) in background for faster response
-    if (user.email) {
-      sendVerificationEmail(user.email, otp); // don't await
-    } else {
-      // Implement SMS sending for phone if needed
-    }
-    return res
-      .status(200)
-      .json({ message: "OTP sent for 2FA. Please verify." });
-  } catch (error) {
-    console.error("Error logging in:", error);
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };
