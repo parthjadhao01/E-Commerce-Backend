@@ -1,7 +1,6 @@
 import Category from "../models/product/CategoryModel.js";
 import fs from "fs";
-import path from "path";
-
+import cloudinary from "../config/cloudinary.js";
 // Helper function to delete old file
 const deleteFile = (filePath) => {
   if (filePath && fs.existsSync(filePath)) {
@@ -11,73 +10,76 @@ const deleteFile = (filePath) => {
 
 // Create a new category
 export const createCategory = async (req, res) => {
-  try {
-    const {
-      name,
-      slug,
-      parentId,
-      level,
-      icon,
-      image,
-      status,
-      sortOrder,
-      isFeatured,
-      metaTitle,
-      metaDescription,
-    } = req.body;
+    try {
+        const { name, slug, parentId, level, status, sortOrder, isFeatured, metaTitle, metaDescription } = req.body;
 
-    if (!name || !slug) {
-      return res.status(400).json({ message: "Name and slug are required" });
+        if (!name || !slug) {
+            return res.status(400).json({ message: "Name and slug are required" });
+        }
+
+        // Check slug uniqueness
+        const existing = await Category.findOne({ slug });
+        if (existing) return res.status(409).json({ message: "Slug already exists" });
+
+        let iconUrl = "";
+        let imageUrl = "";
+
+        // ---------------------------
+        //  UPLOAD FILES TO CLOUDINARY
+        // ---------------------------
+        if (req.files) {
+            // Icon
+            if (req.files.icon && req.files.icon[0]) {
+                const result = await cloudinary.uploader.upload(req.files.icon[0].path, {
+                    folder: "ecommerce/categories/icons",
+                });
+                iconUrl = result.secure_url;
+
+                // Remove local file
+                fs.unlinkSync(req.files.icon[0].path);
+            }
+
+            // Image
+            if (req.files.image && req.files.image[0]) {
+                const result = await cloudinary.uploader.upload(req.files.image[0].path, {
+                    folder: "ecommerce/categories/images",
+                });
+                imageUrl = result.secure_url;
+
+                // Remove local file
+                fs.unlinkSync(req.files.image[0].path);
+            }
+        }
+
+        // Create category
+        const category = await Category.create({
+            name,
+            slug,
+            parentId: parentId || null,
+            level: level || 0,
+            icon: iconUrl,
+            image: imageUrl,
+            status: status !== undefined ? status : true,
+            sortOrder: sortOrder || 0,
+            isFeatured: isFeatured || false,
+            metaTitle,
+            metaDescription,
+        });
+
+        res.status(201).json(category);
+    } catch (err) {
+        console.error(err);
+
+        // Delete local files if something fails
+        if (req.files) {
+            if (req.files.icon) fs.unlinkSync(req.files.icon[0].path);
+            if (req.files.image) fs.unlinkSync(req.files.image[0].path);
+        }
+
+        res.status(500).json({ message: err.message });
     }
-
-    // Check for unique slug
-    const existing = await Category.findOne({ slug });
-    if (existing) {
-      return res.status(409).json({ message: "Slug already exists" });
-    }
-
-    // Handle file uploads or URL links
-    let iconPath = icon || "";
-    let imagePath = image || "";
-
-    // If files are uploaded, use uploaded file paths
-    if (req.files) {
-      if (req.files.icon) {
-        iconPath = `/uploads/categories/${req.files.icon[0].filename}`;
-      }
-      if (req.files.image) {
-        imagePath = `/uploads/categories/${req.files.image[0].filename}`;
-      }
-    }
-
-    const category = await Category.create({
-      name,
-      slug,
-      parentId: parentId || null,
-      level: level || 0,
-      icon: iconPath,
-      image: imagePath,
-      status: status !== undefined ? status : true,
-      sortOrder: sortOrder || 0,
-      isFeatured: isFeatured || false,
-      metaTitle,
-      metaDescription,
-    });
-
-    res.status(201).json(category);
-  } catch (err) {
-    // Clean up uploaded files if category creation fails
-    if (req.files) {
-      if (req.files.icon) {
-        deleteFile(`./uploads/categories/${req.files.icon[0].filename}`);
-      }
-      if (req.files.image) {
-        deleteFile(`./uploads/categories/${req.files.image[0].filename}`);
-      }
-    }
-    res.status(500).json({ message: err.message });
-  }
 };
+
 
 // Get all categories
 export const getCategories = async (req, res) => {
